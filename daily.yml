@@ -1,0 +1,49 @@
+name: Daily YouTube Senior Trend Report
+
+on:
+  schedule:
+    - cron: "0 6 * * *"
+      timezone: "Asia/Seoul"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  run-agent:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run agent
+        env:
+          YOUTUBE_API_KEY: ${{ secrets.YOUTUBE_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          OPENAI_MODEL: ${{ vars.OPENAI_MODEL || 'gpt-5.5' }}
+          TOP_N: "20"
+          CANDIDATES_PER_CATEGORY: "50"
+          LOOKBACK_DAYS: "30"
+          EXCLUDE_SHORTS: "true"
+          MAX_TRANSCRIPT_CHARS: "18000"
+          TIMEZONE: "Asia/Seoul"
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: python main.py
+
+      - name: Commit report
+        run: |
+          git config user.name "youtube-trend-agent"
+          git config user.email "actions@users.noreply.github.com"
+          git add reports/
+          git diff --cached --quiet || git commit -m "daily YouTube trend report"
+          git push
